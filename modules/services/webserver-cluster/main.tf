@@ -1,27 +1,30 @@
 provider "aws" {
-  region                  = "us-east-1"
+  region    = "us-east-1"
 }
 
 # By default, AWS does not allow any incoming or outgoing traffic from an EC2 Instance
 resource "aws_security_group" "instance"{
-    name = "terraform-example-instance"
-
-    ingress {
-        from_port = "${var.server_port}"
-        to_port = "${var.server_port}"
-        protocol = "tcp"
-        #CIDR blocks are a concise way to specify IP address
-        cidr_blocks = ["0.0.0.0/0"]
-    }
+    name = "${var.cluster_name}-instance"
 
     lifecycle {
         create_before_destroy = true
     }
 }
 
+resource "aws_security_group_rule" "allow_http_requests" {
+    type                = "ingress"
+    security_group_id   = "${aws_security_group.instance.id}"
+    from_port           = "${var.server_port}"
+    to_port             = "${var.server_port}"
+    protocol            = "tcp"
+
+    #CIDR blocks are a concise way to specify IP address
+    cidr_blocks         = ["0.0.0.0/0"]
+}
+
 resource "aws_launch_configuration" "example" {
     image_id = "ami-40d28157"
-    instance_type = "t2.micro"
+    instance_type = "${var.instance_type}"
 
     #we need to tell the EC2 Instance to use it
     security_groups = ["${aws_security_group.instance.id}"]
@@ -34,7 +37,7 @@ resource "aws_launch_configuration" "example" {
 }
 
 data "template_file" "user_data" {
-    template = "${file("user-data.sh")}"
+    template = "${file("${path.module)/user-data.sh}")}"
 
     vars {
         server_port = "${var.server_port}"
@@ -65,39 +68,44 @@ resource "aws_autoscaling_group" "example"{
     # to tell the ASG to register each Instance in the ELB when that Instance is booting
     load_balancers      = ["${aws_elb.example.name}"]
     health_check_type    = "ELB"
-    
-    min_size = 2
-    max_size = 10
+
+    min_size = "${var.min_size}"
+    max_size = "${var.max_size}"
 
     tag {
         key                 = "Name"
-        value               = "terraform-asg-example"
+        value               = "${var.cluster_name}-asg"
         propagate_at_launch = true
     }
 }
 
 # By default, ELB don't allow any incoming or outgoing traffic (just like EC2 Instance)
 resource "aws_security_group" "elb" {
-    name = "terraform-example-elb"
+    name = "${var.cluster_name}-elb"
+}
 
-    ingress {
-        from_port   = 80
-        to_port     = 80
-        protocol    = "tcp"
-        cidr_blocks = ["0.0.0.0/0"]
-    }
+resource "aws_security_group_rule" "allow_http_inbound" {
+    type                = "ingress"
+    security_group_id   = "${aws_security_group.elb.id}"
+    from_port           = 80
+    to_port             = 80
+    protocol            = "tcp"
+    cidr_blocks         = ["0.0.0.0/0"]
+}
+
+resource "aws_security_group_rule" "allow_all_outbound" {
 
     # Outbound requests (to allow health check requests)
-    egress {
-        from_port   = 0
-        to_port     = 0
-        protocol    = -1
-        cidr_blocks = ["0.0.0.0/0"]
-    }
+    type                = "egress"
+    security_group_id   = "${aws_security_group.elb.id}"
+    from_port           = 0
+    to_port             = 0
+    protocol            = -1
+    cidr_blocks         = ["0.0.0.0/0"]
 }
 
 resource "aws_elb" "example" {
-    name                = "terraform-asg-example"
+    name                = "${var.cluster_name}-asg"
     availability_zones  = ["${data.aws_availability_zones.all.names}"]
     security_groups     = ["${aws_security_group.elb.id}"]
 
