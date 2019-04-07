@@ -3,7 +3,7 @@ provider "aws" {
 }
 
 module "aws_db_instance" "example" {
-    source = "..\/..\/..\/..\/modules\/data-stores\/mysql"
+    source = "../../../../modules/data-stores/mysql"
 
     db_instance_type    = "db.t2.micro"
     db_name             = "prod_database"

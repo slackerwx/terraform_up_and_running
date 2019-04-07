@@ -3,11 +3,11 @@ provider "aws" {
 }
 
 module "webserver_cluster" {
-    source = "..\/..\/..\/..\/modules\/services\/webserver-cluster"
+    source = "../../../../modules/services/webserver-cluster"
 
     cluster_name            = "webserver-stage"
     db_remote_state_bucket  = "terraform-up-and-running-bucket"
-    db_remote_state_key     = "prodt/data-stores/mysql/terraform.tfstate"
+    db_remote_state_key     = "live/prod/data-stores/mysql/terraform.tfstate"
 
     #instance_type = "m4.large" 
     instance_type = "t2.micro"
