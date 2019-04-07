@@ -23,3 +23,8 @@ resource "aws_security_group_rule" "allow_testing_inbound" {
     protocol            = "tcp"
     cidr_blocks         = ["0.0.0.0/0"]
 }
+
+terraform {
+  # The configuration for this backend will be filled in by Terragrunt
+  backend "s3" {}
+}
