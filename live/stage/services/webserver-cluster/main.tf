@@ -1,5 +1,5 @@
 provider "aws" {
-    region = "us-east-1"
+    region = "${var.aws_region}"
 }
 
 module "webserver_cluster" {
@@ -7,10 +7,11 @@ module "webserver_cluster" {
 
     ami                     = "ami-40d28157"
     server_text             = "New Server Text"
+    aws_region              = "${var.aws_region}"
 
-    cluster_name            = "webserver-stage"
-    db_remote_state_bucket  = "terraform-up-and-running-bucket"
-    db_remote_state_key     = "live/stage/data-stores/mysql/terraform.tfstate"
+    cluster_name            = "${var.cluster_name}"
+    db_remote_state_bucket  = "${var.db_remote_state_bucket}"
+    db_remote_state_key     = "${var.db_remote_state_key}"
 
     instance_type           = "t2.micro"
     min_size                = 2

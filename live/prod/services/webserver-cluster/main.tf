@@ -1,13 +1,17 @@
 provider "aws" {
-    region = "us-east-1"
+    region = "${var.aws_region}"
 }
 
 module "webserver_cluster" {
     source = "git::https://github.com/slackerwx/terraform_up_and_running.git//modules/services/webserver-cluster"
 
-    cluster_name            = "webserver-prod"
-    db_remote_state_bucket  = "terraform-up-and-running-bucket"
-    db_remote_state_key     = "live/prod/data-stores/mysql/terraform.tfstate"
+    ami                     = "${data.aws_ami.ubuntu.id}"
+    server_text             = "Hello, Production Environment!"
+    aws_region              = "${var.aws_region}"
+
+    cluster_name            = "${var.cluster_name}"
+    db_remote_state_bucket  = "${var.db_remote_state_bucket}"
+    db_remote_state_key     = "${var.db_remote_state_key}"
 
     #instance_type = "m4.large" 
     instance_type = "t2.micro"
