@@ -69,6 +69,10 @@ resource "aws_iam_policy_document" "neo_cloudwatch_ready_only" {
   policy_arn  = "${aws_iam_policy.cloudwatch_full_access.arn}"
 }
 
+resource "aws_iam_user" "existing_user" {
+  name = "Import existing users"
+}
+
 terraform {
   # The configuration for this backend will be filled in by Terragrunt
   backend "s3" {}
