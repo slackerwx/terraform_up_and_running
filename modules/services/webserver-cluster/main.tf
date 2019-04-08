@@ -29,7 +29,12 @@ resource "aws_launch_configuration" "example" {
     #we need to tell the EC2 Instance to use it
     security_groups = ["${aws_security_group.instance.id}"]
 
-    user_data = "${data.template_file.user_data.rendered}"
+    # Takes the list returned by the inner part, which will be of length 1,
+    # and uses the element function to extract that one value
+    user_data = "${element(
+        concat(data.template_file.user_data.*.rendered,
+               data.template_file.user_data_new.*.rendered),
+        0)}"
 
     lifecycle {
         create_before_destroy = true
@@ -37,6 +42,8 @@ resource "aws_launch_configuration" "example" {
 }
 
 data "template_file" "user_data" {
+    count = "${1-var.enable_new_user_data}"
+
     template = "${file("${path.module}/user-data.sh")}"
 
     vars {
@@ -128,4 +135,77 @@ resource "aws_elb" "example" {
 terraform {
   # The configuration for this backend will be filled in by Terragrunt
   backend "s3" {}
+}
+
+resource "aws_autoscaling_schedule" "scale_out_during_business_hours" {
+    // If is true, the count parameter for each of the aws_autoscaling_schedule resources
+    // will be set to 1, so one of each will be created
+    count                   = "${var.enable_autoscaling}"
+
+    scheduled_action_name   = "scale-out-during-business-hours"
+    min_size                = 2
+    max_size                = 10
+    #desired_capacity       = 10
+    desired_capacity        = 3
+    recurrence              = "0 9 * * *"
+
+    autoscaling_group_name  = "${aws_autoscaling_group.example.name}"
+}
+
+resource "aws_autoscaling_schedule" "scale_in_at_night" {
+    // If is true, the count parameter for each of the aws_autoscaling_schedule resources
+    // will be set to 1, so one of each will be created
+    count                   = "${var.enable_autoscaling}"
+
+    scheduled_action_name   = "scale-in-at-night"
+    min_size                = 2
+    max_size                = 10
+    desired_capacity        = 2
+    recurrence              = "0 17 * * *"
+
+    autoscaling_group_name  = "${aws_autoscaling_group.example.name}"
+}
+
+resource "aws_cloudwatch_metric_alarm" "high_cpu_utilization" {
+    alarm_name          = "${var.cluster_name}-high-cpu-utilization"
+    namespace           = "AWS/EC2"
+    metric_name         = "CPUUtilization"
+    dimensions = {
+        AutoScalingGroupName = "${aws_autoscaling_group.example.name}"
+    }
+    comparison_operator = "GreaterThanThreshold"
+    evaluation_periods  = 1
+    period              = 300 #seconds
+    threshold           = 90
+    unit                = "Percent"
+}
+
+resource "aws_cloudwatch_metric_alarm" "low_cpu_credit_balance" {
+    # produces 1 for instance types that start with “t” and a 0 otherwise,
+    # ensuring the alarm is only created for instance types that actually
+    # have a CPUCreditBalance metric.
+//    count               = "${replace(replace(var.instance_type, "/^[^t].*/", "0" ),"/^t.*$", "1")}"
+    count               = "${format("%.1s", var.instance_type) == "t" ? 1 : 0}"
+
+    alarm_name          = "${var.cluster_name}-low-cpu-credit-balance"
+    namespace           = "AWS/EC2"
+    metric_name         = "CPUCreditBalance"
+    dimensions = {
+        AutoScalingGroupName = "${aws_autoscaling_group.example.name}"
+    }
+    comparison_operator = "LessThanThreshold"
+    evaluation_periods  = 1
+    period              = 300 #seconds
+    statistic           = "Minimum"
+    threshold           = 10
+    unit                = "Count"
+}
+
+data "template_file" "user_data_new" {
+    count       = "${var.enable_new_user_data}"
+    template    = "${file("${path.module}/user-data-new.sh")}"
+
+    vars {
+        server_port = "${var.server_port}"
+    }
 }
